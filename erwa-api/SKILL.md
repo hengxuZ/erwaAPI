@@ -35,11 +35,13 @@ Authorization: Bearer <your-token>
 
 | 模块 | 接口 | 方法 | 说明 |
 |------|------|------|------|
-| CA追踪 | `/api/v1/group_ca/by-ca/{ca}` | GET | 根据CA查群组来源 |
 | CA追踪 | `/api/v1/group_ca` | GET | CA列表（支持多维筛选） |
 | CA追踪 | `/api/v1/group_ca/popular` | GET | 热门CA统计 |
 | CA追踪 | `/api/v1/group_ca/latest` | GET | 最新CA记录 |
 | CA追踪 | `/api/v1/group_ca/by-username/{name}` | GET | 按用户名查CA |
+| CA追踪 | `/api/v1/group_ca/query_group` | GET | 根据CA查群组来源 |
+| CA追踪 | `/api/v1/group_ca/user_content` | GET | 查询群友讨论情况 |
+| 链接追踪 | `/api/v1/group_http` | GET | HTTP链接列表 |
 | 群聊总结 | `/api/v1/summaries` | GET | AI群聊总结 |
 | 群聊总结 | `/api/v1/summaries/narratives` | GET | 每日热门叙事 |
 | KOL观点 | `/api/v1/second_kol` | GET | 二级KOL输出数据 |
@@ -51,6 +53,7 @@ Authorization: Bearer <your-token>
 | 快讯 | `/api/v1/newsflash/latest` | GET | 最新快讯 |
 | 系统 | `/api/v1/token/usage` | GET | Token使用次数 |
 | WebSocket | `/ws/new_ca` | WS | 全局新CA实时推送 |
+| WebSocket | `/ws/new_http` | WS | 新HTTP链接实时推送 |
 | WebSocket | `/ws/group_ca` | WS | 群组/用户/CA订阅 |
 | WebSocket | `/ws/popular_ca` | WS | 热门CA实时排行 |
 
@@ -58,59 +61,17 @@ Authorization: Bearer <your-token>
 
 ## 核心接口详情
 
-### 1. 根据CA查群组
-
-输入CA地址，返回所有发过该CA的群组列表。
-
-**Endpoint**: `GET /api/v1/group_ca/by-ca/{ca_address}`
-
-```bash
-curl "http://88.222.241.169/api/v1/group_ca/by-ca/7m3HtU4RDiXWpAt546HHC7Lho3Qzvz6tx2MiAmLiHpLn" \
-  -H "Authorization: Bearer <token>"
-```
-
-**Response**:
-```json
-{
-  "ca": "7m3HtU4RDiXWpAt546HHC7Lho3Qzvz6tx2MiAmLiHpLn",
-  "total_groups": 3,
-  "groups": ["crazySen聊天", "孙哥聊天", "测试群组"]
-}
-```
-
----
-
-### 2. CA列表
+### 1. CA列表
 
 **Endpoint**: `GET /api/v1/group_ca`
 
 **Query Parameters**:
 - `ca` (string): CA地址模糊搜索
-- `http` (string): HTTP链接模糊搜索
 - `username` (string): 用户名筛选
 - `group_name` (string): 群组名称筛选
-- `limit` (int): 返回数量，默认20，最大1000
+- `limit` (int): 返回数量，默认100，最大1000
 - `skip` (int): 跳过记录数
 - `date` (date): 按日期筛选 (YYYY-MM-DD)
-- `only_http` (bool): 仅返回HTTP链接
-
-```bash
-# 按CA搜索
-curl "http://88.222.241.169/api/v1/group_ca?ca=0x6106c7d9&limit=10" \
-  -H "Authorization: Bearer <token>"
-
-# 按用户名搜索
-curl "http://88.222.241.169/api/v1/group_ca?username=白菜&limit=10" \
-  -H "Authorization: Bearer <token>"
-
-# 按群组搜索
-curl "http://88.222.241.169/api/v1/group_ca?group_name=区块日记&limit=10" \
-  -H "Authorization: Bearer <token>"
-
-# 仅返回今天的HTTP链接
-curl "http://88.222.241.169/api/v1/group_ca?only_http=true&limit=10" \
-  -H "Authorization: Bearer <token>"
-```
 
 **Response** (每条记录字段):
 ```json
@@ -120,11 +81,11 @@ curl "http://88.222.241.169/api/v1/group_ca?only_http=true&limit=10" \
   "username": "白菜",
   "group_name": "区块日记群",
   "create_time": "2026-03-13T11:34:24",
-  "http": null,
-  "symbol": "代币符号",
+  "symbol": "PEPE",
   "chain": "bsc",
-  "token_name": "代币名字",
+  "token_name": "Pepe Token",
   "market_cap": "6.4K",
+  "first_market_cap": "2.1K",
   "age": 7,
   "total_mentions": 5,
   "twitter": "https://twitter.com/token123",
@@ -135,26 +96,32 @@ curl "http://88.222.241.169/api/v1/group_ca?only_http=true&limit=10" \
   "h1_buys": 50,
   "h6_buys": 200,
   "h24_buys": 500,
-  "mc_change": {
-    "first_mc": "2.1K",
-    "current_mc": "6.4K",
-    "change_pct": 204.76
-  }
+  "user_content": "这个币看起来不错，可以关注一下",
+  "liquidity": "37.5K",
+  "volume_24h": "3.9M"
 }
 ```
 
 **字段说明**:
-- `market_cap`: 市值（>=1000用K，>=1000K用M，>=1000M用B）
+- `symbol`: 代币简称
+- `chain`: 公链（bsc/sol/base/eth）
+- `token_name`: 代币全称
+- `market_cap`: 当前市值（>=1000用K，>=1000K用M，>=1000M用B）
+- `first_market_cap`: 首次被提及时的市值
 - `age`: 代币从创建到被提及的时间（分钟）
 - `total_mentions`: 48h内提及次数
-- `mc_change`: 首次提及 vs 当前市值变化（仅 total_mentions>1 时返回）
-- `chain`: 公链（bsc/sol/base/eth）
+- `summary`: 代币叙事/总结
+- `twitter` / `telegram` / `website`: 社交链接
+- `m5_buys` / `h1_buys` / `h6_buys` / `h24_buys`: 对应时间窗口买入数
+- `user_content`: 群友原始讨论内容（该CA对应的群聊原文）
+- `liquidity`: 流动性（USD格式化，如 37.5K）
+- `volume_24h`: 24小时成交额（USD格式化，如 3.9M）
 
-**展示建议**: 按 `total_mentions` 排序，询问"今日金狗"按 `mc_change.change_pct` 排序
+**展示建议**: 按 `total_mentions` 排序，询问"今日金狗"按 `(market_cap - first_market_cap) / first_market_cap` 排序
 
 ---
 
-### 3. 热门CA统计
+### 2. 热门CA统计
 
 **Endpoint**: `GET /api/v1/group_ca/popular`
 
@@ -165,52 +132,117 @@ curl "http://88.222.241.169/api/v1/group_ca?only_http=true&limit=10" \
 - `limit` (int): 返回数量，默认100
 - `skip` (int): 跳过记录数
 
-```bash
-# 默认当天（>=10次）
-curl "http://88.222.241.169/api/v1/group_ca/popular" \
-  -H "Authorization: Bearer <token>"
-
-# 昨日
-curl "http://88.222.241.169/api/v1/group_ca/popular?date=$(date -v-1d +%F)" \
-  -H "Authorization: Bearer <token>"
-
-# 自定义阈值
-curl "http://88.222.241.169/api/v1/group_ca/popular?min_count=20" \
-  -H "Authorization: Bearer <token>"
-```
+响应字段同 CA列表，额外包含：
+- `mc_change`: 市值变化（仅 popular 接口返回）`{"first_mc": "2.1K", "current_mc": "6.4K", "change_pct": 204.76}`
+- `count`: 提及次数
 
 ---
 
-### 4. 最新CA记录
+### 3. 最新CA记录
 
 **Endpoint**: `GET /api/v1/group_ca/latest`
 
 **Query Parameters**:
 - `limit` (int): 返回数量，默认1，最大100
 
-```bash
-curl "http://88.222.241.169/api/v1/group_ca/latest?limit=20" \
-  -H "Authorization: Bearer <token>"
-```
-
 只返回 `ca` 不为 null 且 `http` 为 null 的记录。
+
+> 推荐使用 WebSocket 方式获取 CA，更快更准：`ws://88.222.241.169/ws/new_ca`
 
 ---
 
-### 5. 按用户名查CA
+### 4. 按用户名查CA
 
 **Endpoint**: `GET /api/v1/group_ca/by-username/{username}`
 
-```bash
-curl "http://88.222.241.169/api/v1/group_ca/by-username/白菜" \
-  -H "Authorization: Bearer <token>"
-```
+**Path Parameters**:
+- `username` (string, 必填): 用户名
+
+**Query Parameters**:
+- `limit` (int): 返回数量，默认50，最大50
 
 最多返回50条。
 
 ---
 
-### 6. AI群聊总结
+### 5. 根据CA查群组
+
+输入CA地址，返回所有发过该CA的群组列表。
+
+**Endpoint**: `GET /api/v1/group_ca/query_group`
+
+**Query Parameters**:
+- `ca` (string, 必填): CA地址（精确匹配）
+
+**Response**:
+```json
+{
+  "ca": "7m3HtU4RDiXWpAt546HHC7Lho3Qzvz6tx2MiAmLiHpLn",
+  "total_groups": 3,
+  "groups": ["crazySen群", "孙哥群", "测试群组"]
+}
+```
+
+---
+
+### 6. HTTP链接列表
+
+查询群组中分享的 HTTP 链接（group_ca 表中 http 不为空的记录）。
+
+**Endpoint**: `GET /api/v1/group_http`
+
+**Query Parameters**:
+- `group_name` (string): 群组名称筛选
+- `limit` (int): 返回数量，默认20，最大100
+- `skip` (int): 跳过记录数
+- `date` (date): 按日期筛选 (YYYY-MM-DD)
+
+**Response** (每条记录字段):
+```json
+{
+  "id": 4564,
+  "username": "白菜",
+  "group_name": "区块日记群",
+  "create_time": "2026-03-13T11:34:24",
+  "http": "https://example.com",
+  "user_content": "这个链接有意思",
+  "summary": null,
+  "liquidity": null,
+  "volume_24h": null
+}
+```
+
+### 7. 查询群友讨论情况
+
+根据 CA 地址或 HTTP 链接查询对应的群友讨论内容（user_content）。
+
+**Endpoint**: `GET /api/v1/group_ca/user_content`
+
+**Query Parameters**:
+- `ca` (string, 可选): CA地址（精确匹配）
+- `http` (string, 可选): HTTP链接（精确匹配）
+- `limit` (int): 返回数量，默认20，最大100
+
+> **注意**: `ca` 和 `http` 至少传一个。
+
+**Response**:
+```json
+[
+  {
+    "id": 12345,
+    "ca": "0x6106c7d92308bbe4204667a59f9b570288954444",
+    "http": null,
+    "username": "白菜",
+    "group_name": "区块日记群",
+    "create_time": "2026-03-13T11:34:24",
+    "user_content": "这个币看起来不错，可以关注一下"
+  }
+]
+```
+
+---
+
+### 7. AI群聊总结
 
 **Endpoint**: `GET /api/v1/summaries`
 
@@ -221,43 +253,28 @@ curl "http://88.222.241.169/api/v1/group_ca/by-username/白菜" \
 - `start_date` / `end_date` (datetime): 时间范围
 - `limit` (int): 返回数量，默认100
 
-```bash
-# 今天所有群组总结
-curl "http://88.222.241.169/api/v1/summaries" \
-  -H "Authorization: Bearer <token>"
-
-# 指定群组+日期
-curl "http://88.222.241.169/api/v1/summaries?group_name=crazySen群&date=2026-03-07" \
-  -H "Authorization: Bearer <token>"
-```
-
 **群组分类参考**:
 
 | 类型 | 群组 |
 |------|------|
 | Meme/土狗 | cryptoD、0xSun、GDC、James、金蛙、985、镭射猫、crazySen、0xAA、AD、区块日记 |
-| 空投 | leng、P总、小鑫、十一地主、十一空投、3D群 |
+| 空投 | leng、P总、小鑫、十一地主、十一Eleve、3D群 |
 | 打新 | 中国万岁、AKAKAY、Meta |
 
 ---
 
-### 7. 每日热门叙事
+### 8. 每日热门叙事
 
 **Endpoint**: `GET /api/v1/summaries/narratives`
 
-```bash
-curl "http://88.222.241.169/api/v1/summaries/narratives" \
-  -H "Authorization: Bearer <token>"
-
-curl "http://88.222.241.169/api/v1/summaries/narratives?date=2026-03-06" \
-  -H "Authorization: Bearer <token>"
-```
+**Query Parameters**:
+- `date` (date): 日期，默认今天
 
 返回提及次数最多的前10条CA的 `summary`（代币叙事）字段。
 
 ---
 
-### 8. 二级KOL数据
+### 9. 二级KOL数据
 
 **Endpoint**: `GET /api/v1/second_kol`
 
@@ -267,20 +284,6 @@ curl "http://88.222.241.169/api/v1/summaries/narratives?date=2026-03-06" \
 - `start_date` / `end_date` (date): 时间范围
 - `limit` (int): 返回数量，默认50
 - `skip` (int): 跳过数量
-
-```bash
-# 最新KOL数据（自动过滤屏蔽词）
-curl "http://88.222.241.169/api/v1/second_kol" \
-  -H "Authorization: Bearer <token>"
-
-# 按KOL名称查询
-curl "http://88.222.241.169/api/v1/second_kol?kol_name=KOL张三" \
-  -H "Authorization: Bearer <token>"
-
-# 按token查询
-curl "http://88.222.241.169/api/v1/second_kol?token=ABC123" \
-  -H "Authorization: Bearer <token>"
-```
 
 **Response**:
 ```json
@@ -304,7 +307,7 @@ curl "http://88.222.241.169/api/v1/second_kol?token=ABC123" \
 
 ---
 
-### 9. 快讯
+### 10. 快讯
 
 | 接口 | 说明 |
 |------|------|
@@ -312,10 +315,8 @@ curl "http://88.222.241.169/api/v1/second_kol?token=ABC123" \
 | `GET /api/v1/newsflash/date/{date}` | 指定日期快讯 |
 | `GET /api/v1/newsflash/latest` | 最新快讯 |
 
-```bash
-curl "http://88.222.241.169/api/v1/newsflash/today?limit=20" \
-  -H "Authorization: Bearer <token>"
-```
+**Query Parameters** (today/latest):
+- `limit` (int): 返回数量，默认20
 
 **Response**:
 ```json
@@ -331,15 +332,11 @@ curl "http://88.222.241.169/api/v1/newsflash/today?limit=20" \
 
 ---
 
-### 10. Token使用次数
+### 11. Token使用次数
 
 **Endpoint**: `GET /api/v1/token/usage`
 
-```bash
-curl "http://88.222.241.169/api/v1/token/usage" \
-  -H "Authorization: Bearer <token>"
-```
-
+**Response**:
 ```json
 {
   "token": "aaa3b7ad****b1c",
@@ -418,6 +415,48 @@ ws.onopen = () => {
   "timestamp": "2026-03-30T10:30:00"
 }
 ```
+
+### WS 4. 新HTTP链接实时推送
+
+**Endpoint**: `ws://88.222.241.169/ws/new_http`
+
+连接即开始接收所有新HTTP链接，无需订阅。每5秒检查数据库。
+
+```javascript
+const ws = new WebSocket('ws://88.222.241.169/ws/new_http?token=YOUR_TOKEN');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.type === 'new_http') {
+    console.log('新HTTP:', data.data.http, '群组:', data.data.group_name);
+  }
+};
+
+// 心跳
+setInterval(() => ws.send('ping'), 30000);
+```
+
+**推送消息格式**:
+
+```json
+{
+  "type": "new_http",
+  "data": {
+    "id": 12345,
+    "username": "白菜",
+    "group_name": "区块日记群",
+    "create_time": "2026-05-18T21:45:18",
+    "http": "https://example.com",
+    "user_content": "这个链接有意思",
+    "summary": null,
+    "liquidity": null,
+    "volume_24h": null
+  },
+  "timestamp": "2026-05-18T21:45:18"
+}
+```
+
+> 注意：只推送 `http` 不为空且 `ca` 为空的记录。
 
 ---
 
