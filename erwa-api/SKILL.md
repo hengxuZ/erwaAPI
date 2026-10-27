@@ -1,6 +1,6 @@
 ---
 name: erwa-api
-description: 二娃聚合群 API - 群聊 AI 总结、CA/HTTP/X/KOL/TG Call/币安广场数据服务
+description: Use when querying 二娃聚合群/xFinder 的群聊 AI 总结、CA/HTTP/X/KOL/TG Call、GMGN 或 AVE API/WebSocket 数据
 ---
 
 # 二娃聚合群 API Skill
